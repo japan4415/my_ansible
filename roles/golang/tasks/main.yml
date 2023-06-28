@@ -1,0 +1,36 @@
+- name: Check if golang is installed and its version
+  ansible.builtin.command:
+    cmd: go version
+  register: golang_check
+  changed_when: false
+  ignore_errors: true
+
+- name: Debug golang_check
+  ansible.builtin.debug:
+    var: golang_check
+
+- name: Parse version from the golang_check output
+  ansible.builtin.set_fact:
+    golang_version_installed: "{{ golang_check.stdout_lines[0].split()[2].split('go')[1] }}"
+  when: not golang_check.failed
+
+- name: Download golang
+  ansible.builtin.get_url:
+    url: "https://golang.org/dl/go{{ golang_version }}.linux-amd64.tar.gz"
+    dest: "/tmp/go{{ golang_version }}.linux-amd64.tar.gz"
+    mode: '0644'
+  when: golang_check.failed or golang_version_installed is version(golang_version, "<")
+
+- name: Unarchive golang
+  ansible.builtin.unarchive:
+    src: "/tmp/go{{ golang_version }}.linux-amd64.tar.gz"
+    dest: "/home/{{ ansible_user }}/bin"
+    remote_src: false
+  when: golang_check.failed or golang_version_installed is version(golang_version, "<")
+
+- name: Add bin path to config.fish
+  ansible.builtin.lineinfile:
+    path: /home/{{ ansible_user }}/.config/fish/config.fish
+    regexp: "set -x PATH \"$HOME/bin:$PATH\""
+    line: "\t# bin Path\n\tset -x PATH \"$HOME/bin:$PATH\""
+    insertafter: "if status is-interactive"

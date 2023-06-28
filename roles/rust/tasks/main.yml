@@ -1,0 +1,81 @@
+- name: Ensure curl is installed
+  ansible.builtin.apt:
+    name: curl
+    state: present
+  become: true
+
+- name: Check if rustup is installed and its version
+  ansible.builtin.command:
+    cmd: rustup --version
+  register: rustup_check
+  changed_when: false
+  ignore_errors: true
+
+- name: Debug rustup_check
+  ansible.builtin.debug:
+    var: rustup_check
+
+- name: Parse version from the rustup_check output
+  ansible.builtin.set_fact:
+    rustup_version_installed: "{{ rustup_check.stdout_lines[0].split()[1] }}"
+  when: not rustup_check.failed
+
+- name: Download rustup Installer
+  ansible.builtin.get_url:
+    url: "https://sh.rustup.rs"
+    dest: "/tmp/rustup.sh"
+    mode: '0755'
+  when: rustup_check.failed
+
+- name: Install rustup using the installer
+  ansible.builtin.command:
+    cmd: /tmp/rustup.sh
+  when: rustup_check.failed
+  changed_when: false
+
+- name: Check if rustc is installed and its version
+  ansible.builtin.command:
+    cmd: rustc --version
+  register: rustc_check
+  changed_when: false
+  ignore_errors: true
+
+- name: Debug rustc_check
+  ansible.builtin.debug:
+    var: rustc_check
+
+- name: Parse version from the rustc_check output
+  ansible.builtin.set_fact:
+    rustc_version_installed: "{{ rustc_check.stdout_lines[0].split()[1] }}"
+  when: not rustc_check.failed
+
+- name: Check if carg is installed and its version
+  ansible.builtin.command:
+    cmd: cargo --version
+  register: cargo_check
+  changed_when: false
+  ignore_errors: true
+
+- name: Debug cargo_check
+  ansible.builtin.debug:
+    var: cargo_check
+
+- name: Parse version from the cargo_check output
+  ansible.builtin.set_fact:
+    rustup_version_installed: "{{ cargo_check.stdout_lines[0].split()[1] }}"
+  when: not cargo_check.failed
+
+- name: Update rust
+  ansible.builtin.command:
+    cmd: rustup update
+  when: rustup_version_installed is version(rustup_version,"<") \
+    or rustc_version_installed is version(rustc_version,"<") \
+    or cargo_version_installed is version(cargo_version,"<")
+  changed_when: false
+
+- name: Add Rust config to config.fish
+  ansible.builtin.lineinfile:
+    path: /home/{{ ansible_user }}/.config/fish/config.fish
+    regexp: "set -x PATH \"$HOME/.cargo/bin:$PATH\""
+    line: "\t# Rust\n\tset -x PATH \"$HOME/.cargo/bin:$PATH\""
+    insertafter: "if status is-interactive"
