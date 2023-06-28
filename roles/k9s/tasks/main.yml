@@ -1,0 +1,36 @@
+- name: Check if k9s is installed
+  ansible.builtin.command:
+    cmd: k9s version --output=yaml
+  register: k9s_check
+  changed_when: false
+  ignore_errors: true
+
+- name: Debug k9s_check
+  ansible.builtin.debug:
+    var: k9s_check
+
+- name: Parse version from the k9s_check output
+  ansible.builtin.set_fact:
+    k9s_version_installed: "{{ k9s_check.stdout_lines[7].split(\"v\")[1] }}"
+  when: not k9s_check.failed
+
+- name: Download k9s
+  ansible.builtin.get_url:
+    url: "https://github.com/derailed/k9s/releases/download/v{{ k9s_version }}/k9s_Linux_amd64.tar.gz"
+    dest: "/tmp/v{{ k9s_version }}/k9s_Linux_amd64.tar.gz"
+    mode: '0644'
+  when: k9s_check.failed or k9s_version_installed is version(k9s_version, "<")
+
+- name: Unarchive k9s
+  ansible.builtin.unarchive:
+    src: "/tmp/v{{ k9s_version }}/k9s_Linux_amd64.tar.gz"
+    dest: "/home/{{ ansible_user }}/bin"
+    remote_src: false
+  when: k9s_check.failed or k9s_version_installed is version(k9s_version, "<")
+
+- name: Add bin path to config.fish
+  ansible.builtin.lineinfile:
+    path: /home/{{ ansible_user }}/.config/fish/config.fish
+    regexp: "set -x PATH \"$HOME/bin:$PATH\""
+    line: "\t# bin Path\n\tset -x PATH \"$HOME/bin:$PATH\""
+    insertafter: "if status is-interactive"

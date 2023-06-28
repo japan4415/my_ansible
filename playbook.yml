@@ -1,0 +1,19 @@
+- name: Localhost
+  hosts: localhost
+  vars:
+    ansible_user: discord
+    fish_version: 3.6.1
+    rye_version: 0.9.0
+    rustup_version: 1.26.0
+    rustc_version: 1.70.1
+    cargo_version: 1.10.0
+    golang_version: 1.20.5
+    kubectl_version: 1.24.12
+    k9s_versioon: 0.26.7
+  roles:
+    - fish
+    - python
+    - rust
+    - golang
+    - kubectl
+    - k9s

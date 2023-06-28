@@ -1,0 +1,30 @@
+- name: Check if fish is installed and its version
+  ansible.builtin.command:
+    cmd: fish --version
+  register: fish_check
+  changed_when: false
+  ignore_errors: true
+
+- name: Debug fish_check
+  ansible.builtin.debug:
+    var: fish_check
+
+- name: Parse version from the fish_check output
+  ansible.builtin.set_fact:
+    fish_version_installed: "{{ fish_check.stdout_lines[0].split()[2] }}"
+  when: not fish_check.failed
+
+- name: Add fish repository
+  ansible.builtin.apt_repository:
+    repo: ppa:fish-shell/release-3
+    state: present
+    update_cache: true
+  become: true
+  when: fish_check.failed or fish_version_installed is version(fish_version, "<")
+
+- name: Install fish
+  ansible.builtin.apt:
+    name: fish
+    state: present
+  become: true
+  when: fish_check.failed or fish_version_installed is version(fish_version, "<")

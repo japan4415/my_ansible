@@ -1,0 +1,29 @@
+- name: Check if kubectl is installed
+  ansible.builtin.command:
+    cmd: kubectl version --output=yaml
+  register: kubectl_check
+  changed_when: false
+  ignore_errors: true
+
+- name: Debug kubectl_check
+  ansible.builtin.debug:
+    var: kubectl_check
+
+- name: Parse version from the kubectl_check output
+  ansible.builtin.set_fact:
+    kubectl_version_installed: "{{ kubectl_check.stdout_lines[5].split(\":\")[1].split('v')[1] }}"
+  when: not kubectl_check.failed
+
+- name: Download kubectl
+  ansible.builtin.get_url:
+    url: "https://dl.k8s.io/release/v{{ kubectl_version }}/bin/linux/amd64/kubectl"
+    dest: "/home/{{ ansible_user }}/bin"
+    mode: '0755'
+  when: kubectl_check.failed or kubectl_version_installed is version(kubectl_version, "<")
+
+- name: Add bin path to config.fish
+  ansible.builtin.lineinfile:
+    path: /home/{{ ansible_user }}/.config/fish/config.fish
+    regexp: "set -x PATH \"$HOME/bin:$PATH\""
+    line: "\t# bin Path\n\tset -x PATH \"$HOME/bin:$PATH\""
+    insertafter: "if status is-interactive"

@@ -1,0 +1,41 @@
+- name: Ensure curl is installed
+  ansible.builtin.apt:
+    name: curl
+    state: present
+  become: true
+
+- name: Check if rye is installed and its version
+  ansible.builtin.command:
+    cmd: rye --version
+  register: rye_check
+  changed_when: false
+  ignore_errors: true
+
+- name: Debug rye_check
+  ansible.builtin.debug:
+    var: rye_check
+
+- name: Parse version from the rye_check output
+  ansible.builtin.set_fact:
+    rye_version_installed: "{{ rye_check.stdout_lines[0].split()[1] }}"
+  when: not rye_check.failed
+
+- name: Download rye
+  ansible.builtin.get_url:
+    url: "https://rye-up.com/get"
+    dest: "/tmp/rye.sh"
+    mode: '0755'
+  when: rye_check.failed or rye_version_installed is version(rye_version, "<")
+
+- name: Install rye using the installer
+  ansible.builtin.command:
+    cmd: /tmp/rye.sh
+  when: rye_check.failed or rye_version_installed is version(rye_version, "<")
+  changed_when: false
+
+- name: Add Rye config to config.fish
+  ansible.builtin.lineinfile:
+    path: /home/{{ ansible_user }}/.config/fish/config.fish
+    regexp: "set -x PATH \"$HOME/.rye/shims\" $PATH"
+    line: "\t# Rye\n\tif not contains -- \"$HOME/.rye/shims\" $PATH\n\t\tset -x PATH \"$HOME/.rye/shims\" $PATH\n\tend"
+    insertafter: "if status is-interactive"
